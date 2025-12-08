@@ -1,0 +1,30 @@
+{
+  "name": "border-safety-risk-checker",
+  "version": "1.0.0",
+  "description": "Full-stack web application to check proximity risk to Thai-Cambodia border artillery ranges",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "cd backend && npm start",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "postinstall": "cd backend && npm install && cd ../frontend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "border",
+    "safety",
+    "risk",
+    "thailand",
+    "cambodia",
+    "artillery",
+    "BM-21",
+    "PHL-03"
+  ],
+  "author": "",
+  "license": "MIT"
+}
