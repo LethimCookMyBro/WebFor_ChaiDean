@@ -37,7 +37,7 @@ A full-stack web application for civilians in Thai border provinces to check the
 
 ```bash
 # Clone the repository
-git clone <repo-url>
+git clone https://github.com/LethimCookMyBro/WebFor_ChaiDean.git
 cd border-safety-risk-checker
 
 # Install all dependencies
