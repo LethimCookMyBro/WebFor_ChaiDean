@@ -44,7 +44,20 @@ export default function LiveReports({ userLocation = null }) {
     
     // Auto-refresh every 60 seconds
     const interval = setInterval(fetchReports, 60000)
-    return () => clearInterval(interval)
+    
+    // Listen for storage changes (when Admin modifies data from another tab)
+    const handleStorageChange = (e) => {
+      if (e.key === 'userReports') {
+        console.log('[LiveReports] Storage changed, refreshing...')
+        fetchReports()
+      }
+    }
+    window.addEventListener('storage', handleStorageChange)
+    
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('storage', handleStorageChange)
+    }
   }, [userLocation?.lat, userLocation?.lng])
 
   const getReportIcon = (type) => {

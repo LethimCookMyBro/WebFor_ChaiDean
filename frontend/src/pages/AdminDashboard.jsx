@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import {
   Shield, Radio, CheckCircle, Clock, MapPin, RefreshCw, 
   Home, Send, MessageSquare, Trash2, LogOut, Activity, Search,
-  FileText, ChevronLeft, ChevronRight, AlertTriangle, Lock, Ban
+  FileText, ChevronLeft, ChevronRight, AlertTriangle, Lock, Ban,
+  ExternalLink, Edit
 } from 'lucide-react'
 
 // Threat levels
@@ -39,6 +40,12 @@ export default function AdminDashboard() {
   const [reportsPage, setReportsPage] = useState(1)
   const REPORTS_PER_PAGE = 30
 
+  // Report Selection & Edit State
+  const [selectedReports, setSelectedReports] = useState([])
+  const [customReportDeleteCount, setCustomReportDeleteCount] = useState('')
+  const [editingReport, setEditingReport] = useState(null)
+  const [editForm, setEditForm] = useState({ description: '', location: '', type: '' })
+
   // System Logs State
   const [logs, setLogs] = useState([])
   const [logsPage, setLogsPage] = useState(1)
@@ -68,21 +75,10 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     setLoading(true)
     
-    // 1. Fetch Reports
-    try {
-        const res = await fetch(`${API_BASE}/api/v1/reports`)
-        if (res.ok) {
-            const data = await res.json()
-            setReports(data.reports || [])
-        } else {
-             // Fallback to localStorage
-             const userReports = JSON.parse(localStorage.getItem('userReports') || '[]')
-             setReports(userReports)
-        }
-    } catch (e) {
-        const userReports = JSON.parse(localStorage.getItem('userReports') || '[]')
-        setReports(userReports)
-    }
+    // 1. Fetch Reports - ใช้ localStorage เป็น single source of truth
+    // ไม่ดึงจาก API เพราะจะทำให้เกิด duplicate และ sync issues
+    const userReports = JSON.parse(localStorage.getItem('userReports') || '[]')
+    setReports(userReports)
 
     // 2. Fetch Broadcasts
     const broadcastData = JSON.parse(localStorage.getItem('adminBroadcasts') || '[]')
@@ -173,12 +169,80 @@ export default function AdminDashboard() {
     localStorage.setItem('userReports', JSON.stringify(updated))
     // Then update state
     setReports(updated)
+    setSelectedReports(prev => prev.filter(id => id !== reportId))
     
     try {
         await fetch(`${API_BASE}/api/v1/reports/${reportId}`, { method: 'DELETE' })
     } catch (e) {
         console.error('API Error', e)
     }
+  }
+
+  // --- Edit Report ---
+  const handleEditReport = (report) => {
+    setEditingReport(report)
+    setEditForm({
+      description: report.description || '',
+      location: report.location || '',
+      type: report.type || ''
+    })
+  }
+
+  const handleSaveEdit = () => {
+    if (!editingReport) return
+    const currentReports = JSON.parse(localStorage.getItem('userReports') || '[]')
+    const updated = currentReports.map(r => 
+      r.id === editingReport.id 
+        ? { ...r, description: editForm.description, location: editForm.location, type: editForm.type, editedAt: new Date().toISOString() } 
+        : r
+    )
+    localStorage.setItem('userReports', JSON.stringify(updated))
+    setReports(updated)
+    setEditingReport(null)
+    addSystemLog(`Edited report ${editingReport.id}`)
+  }
+
+  // --- Bulk Report Selection & Delete ---
+  const toggleReportSelection = (reportId) => {
+    setSelectedReports(prev => prev.includes(reportId) ? prev.filter(id => id !== reportId) : [...prev, reportId])
+  }
+
+  const toggleSelectAllReports = () => {
+    const currentIds = getPaginatedReports().map(r => r.id)
+    const allSelected = currentIds.every(id => selectedReports.includes(id))
+    if (allSelected) {
+      setSelectedReports(prev => prev.filter(id => !currentIds.includes(id)))
+    } else {
+      setSelectedReports(prev => [...new Set([...prev, ...currentIds])])
+    }
+  }
+
+  const handleDeleteSelectedReports = () => {
+    if (selectedReports.length === 0) return
+    if (!confirm(`ยืนยันลบ ${selectedReports.length} รายงาน?`)) return
+    
+    const currentReports = JSON.parse(localStorage.getItem('userReports') || '[]')
+    const updated = currentReports.filter(r => !selectedReports.includes(r.id))
+    localStorage.setItem('userReports', JSON.stringify(updated))
+    setReports(updated)
+    setSelectedReports([])
+    addSystemLog(`Bulk deleted ${selectedReports.length} reports`)
+  }
+
+  const handleBulkDeleteReports = (countInput) => {
+    const currentReports = JSON.parse(localStorage.getItem('userReports') || '[]')
+    let count = 0
+    if (countInput === 'all') count = currentReports.length
+    else count = Math.min(parseInt(countInput) || 0, currentReports.length)
+    
+    if (count <= 0) return
+    if (!confirm(`ยืนยันลบ ${count} รายงานล่าสุด?`)) return
+    
+    const updated = currentReports.slice(count)
+    localStorage.setItem('userReports', JSON.stringify(updated))
+    setReports(updated)
+    setSelectedReports([])
+    addSystemLog(`Bulk deleted ${count} reports`)
   }
 
   // --- Log Actions ---
@@ -441,52 +505,140 @@ export default function AdminDashboard() {
                     </select>
                 </div>
 
+                {/* Bulk Actions Bar */}
+                <div className="p-3 bg-slate-100 border-b flex gap-3 items-center flex-wrap text-sm">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={getPaginatedReports().length > 0 && getPaginatedReports().every(r => selectedReports.includes(r.id))}
+                            onChange={toggleSelectAllReports}
+                            className="w-4 h-4 rounded"
+                        />
+                        <span>เลือกทั้งหน้า</span>
+                    </label>
+                    {selectedReports.length > 0 && (
+                        <>
+                            <span className="text-blue-600 font-medium">เลือกแล้ว {selectedReports.length}</span>
+                            <button onClick={handleDeleteSelectedReports} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600">
+                                🗑️ ลบที่เลือก ({selectedReports.length})
+                            </button>
+                        </>
+                    )}
+                    <span className="text-slate-300">|</span>
+                    <span className="text-slate-600">ลบจำนวน:</span>
+                    {[10, 50, 100].map(cnt => (
+                        <button key={cnt} onClick={() => handleBulkDeleteReports(cnt)} disabled={reports.length === 0} className="px-2 py-1 bg-slate-200 hover:bg-slate-300 disabled:opacity-50 rounded text-xs">
+                            {cnt}
+                        </button>
+                    ))}
+                    <button onClick={() => handleBulkDeleteReports('all')} disabled={reports.length === 0} className="px-2 py-1 bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 rounded text-xs">
+                        ทั้งหมด
+                    </button>
+                    <div className="flex items-center gap-1">
+                        <input
+                            type="number"
+                            min="1"
+                            max={reports.length}
+                            value={customReportDeleteCount}
+                            onChange={(e) => setCustomReportDeleteCount(e.target.value)}
+                            placeholder="จำนวน"
+                            className="w-16 px-2 py-1 border rounded text-xs"
+                        />
+                        <button
+                            onClick={() => { if (customReportDeleteCount && parseInt(customReportDeleteCount) > 0) { handleBulkDeleteReports(customReportDeleteCount); setCustomReportDeleteCount('') }}}
+                            disabled={!customReportDeleteCount}
+                            className="px-2 py-1 bg-orange-500 text-white disabled:bg-slate-300 rounded text-xs"
+                        >
+                            ลบ
+                        </button>
+                    </div>
+                </div>
+
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-slate-100 text-slate-600 uppercase font-medium">
                             <tr>
-                                <th className="px-4 py-3">เวลา</th>
-                                <th className="px-4 py-3">ประเภท</th>
-                                <th className="px-4 py-3">IP Address</th>
-                                <th className="px-4 py-3">รายละเอียด</th>
-                                <th className="px-4 py-3">สถานที่</th>
-                                <th className="px-4 py-3">สถานะ</th>
-                                <th className="px-4 py-3">จัดการ</th>
+                                <th className="px-2 py-3 w-10">
+                                    <input
+                                        type="checkbox"
+                                        checked={getPaginatedReports().length > 0 && getPaginatedReports().every(r => selectedReports.includes(r.id))}
+                                        onChange={toggleSelectAllReports}
+                                        className="w-4 h-4 rounded"
+                                    />
+                                </th>
+                                <th className="px-3 py-3">เวลา</th>
+                                <th className="px-3 py-3">ประเภท</th>
+                                <th className="px-3 py-3">IP Address</th>
+                                <th className="px-3 py-3">รายละเอียด</th>
+                                <th className="px-3 py-3">สถานที่</th>
+                                <th className="px-3 py-3">พิกัด GPS</th>
+                                <th className="px-3 py-3">สถานะ</th>
+                                <th className="px-3 py-3">จัดการ</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
                             {getPaginatedReports().length === 0 ? (
-                                <tr><td colSpan="7" className="p-8 text-center text-slate-400">ไม่พบรายงาน</td></tr>
+                                <tr><td colSpan="9" className="p-8 text-center text-slate-400">ไม่พบรายงาน</td></tr>
                             ) : getPaginatedReports().map(r => (
-                                <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-4 py-3 whitespace-nowrap text-slate-500">{formatTime(r.time)}</td>
-                                    <td className="px-4 py-3 font-medium">{getReportTypeLabel(r.type)}</td>
-                                    <td className="px-4 py-3">
+                                <tr key={r.id} className={`hover:bg-slate-50 transition-colors ${selectedReports.includes(r.id) ? 'bg-blue-50' : ''}`}>
+                                    <td className="px-2 py-3">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedReports.includes(r.id)}
+                                            onChange={() => toggleReportSelection(r.id)}
+                                            className="w-4 h-4 rounded"
+                                        />
+                                    </td>
+                                    <td className="px-3 py-3 whitespace-nowrap text-slate-500">{formatTime(r.time)}</td>
+                                    <td className="px-3 py-3 font-medium">{getReportTypeLabel(r.type)}</td>
+                                    <td className="px-3 py-3">
                                         <span className="font-mono text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
                                             {r.ip || r.ip_address || 'N/A'}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3 max-w-xs truncate" title={r.description}>{r.description || '-'}</td>
-                                    <td className="px-4 py-3">
+                                    <td className="px-3 py-3 max-w-xs truncate" title={r.description}>{r.description || '-'}</td>
+                                    <td className="px-3 py-3">
                                         <div className="flex items-center gap-1">
                                             <MapPin className="w-3 h-3 text-slate-400"/>
                                             {r.location || 'ไม่ระบุ'}
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3">
+                                    <td className="px-3 py-3">
+                                        {r.lat && r.lng ? (
+                                            <a
+                                                href={`https://www.google.com/maps?q=${r.lat},${r.lng}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-500 hover:underline text-xs flex items-center gap-1"
+                                            >
+                                                📍 {Number(r.lat).toFixed(4)}, {Number(r.lng).toFixed(4)}
+                                                <ExternalLink className="w-3 h-3"/>
+                                            </a>
+                                        ) : (
+                                            <span className="text-slate-400 text-xs">ไม่มีพิกัด</span>
+                                        )}
+                                    </td>
+                                    <td className="px-3 py-3">
                                         {r.verified ? 
-                                            <span className="text-green-600 bg-green-100 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit"><CheckCircle className="w-3 h-3"/> ยืนยันแล้ว</span> : 
-                                            <span className="text-amber-600 bg-amber-100 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit"><AlertTriangle className="w-3 h-3"/> รอตรวจสอบ</span>
+                                            <span className="text-green-600 bg-green-100 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit"><CheckCircle className="w-3 h-3"/> ยืนยัน</span> : 
+                                            <span className="text-amber-600 bg-amber-100 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit"><AlertTriangle className="w-3 h-3"/> รอ</span>
                                         }
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex gap-2">
+                                    <td className="px-3 py-3">
+                                        <div className="flex gap-1">
                                             <button 
                                                 onClick={() => handleVerifyReport(r.id, r.verified)}
                                                 className={`p-1 rounded ${r.verified ? 'text-amber-500 hover:bg-amber-50' : 'text-green-500 hover:bg-green-50'}`}
-                                                title={r.verified ? "ยกเลิกการยืนยัน" : "ยืนยันความถูกต้อง"}
+                                                title={r.verified ? "ยกเลิกยืนยัน" : "ยืนยัน"}
                                             >
                                                 <CheckCircle className="w-4 h-4"/>
+                                            </button>
+                                            <button 
+                                                onClick={() => handleEditReport(r)}
+                                                className="p-1 text-blue-500 hover:bg-blue-50 rounded"
+                                                title="แก้ไข"
+                                            >
+                                                <Edit className="w-4 h-4"/>
                                             </button>
                                             <button 
                                                 onClick={() => handleDeleteReport(r.id)}
@@ -725,6 +877,107 @@ export default function AdminDashboard() {
                     </div>
                  </div>
             </div>
+        )}
+
+        {/* Edit Report Modal */}
+        {editingReport && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <Edit className="w-5 h-5 text-blue-500" />
+                แก้ไขรายงาน
+              </h2>
+              
+              {/* Report ID */}
+              <div className="mb-4 text-xs text-slate-500 font-mono bg-slate-50 px-2 py-1 rounded">
+                ID: {editingReport.id}
+              </div>
+              
+              {/* ประเภท */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-1">ประเภท</label>
+                <select
+                  value={editForm.type}
+                  onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}
+                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="explosion">💥 เสียงระเบิด</option>
+                  <option value="gunfire">🔫 เสียงปืน</option>
+                  <option value="military">🪖 การเคลื่อนพล</option>
+                  <option value="roadblock">🚧 ถนนปิด</option>
+                  <option value="evacuation">🏃 จุดอพยพเปิด</option>
+                  <option value="warning">⚠️ แจ้งเตือนอื่นๆ</option>
+                </select>
+              </div>
+              
+              {/* สถานที่ */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-1">สถานที่</label>
+                <input
+                  type="text"
+                  value={editForm.location}
+                  onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="ต.xxx อ.xxx"
+                />
+              </div>
+              
+              {/* รายละเอียด */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-1">รายละเอียด</label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  rows={4}
+                  placeholder="รายละเอียดเพิ่มเติม..."
+                />
+              </div>
+              
+              {/* Report Info */}
+              <div className="mb-4 p-3 bg-slate-50 rounded-lg text-xs text-slate-600 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">IP:</span>
+                  <span className="font-mono">{editingReport.ip || 'N/A'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">เวลาส่ง:</span>
+                  <span>{new Date(editingReport.time).toLocaleString('th-TH')}</span>
+                </div>
+                {editingReport.lat && editingReport.lng && (
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">พิกัด:</span>
+                    <span>{Number(editingReport.lat).toFixed(4)}, {Number(editingReport.lng).toFixed(4)}</span>
+                    <a
+                      href={`https://www.google.com/maps?q=${editingReport.lat},${editingReport.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-500 hover:underline flex items-center gap-1"
+                    >
+                      🔗 ดูแผนที่
+                    </a>
+                  </div>
+                )}
+              </div>
+              
+              {/* Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setEditingReport(null)}
+                  className="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 rounded-lg font-medium transition-colors"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  บันทึก
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </main>
     </div>

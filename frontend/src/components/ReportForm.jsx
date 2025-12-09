@@ -79,19 +79,78 @@ export default function ReportForm({ onSubmitSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(null)
-    if (!clientIP) { setError('ไม่สามารถระบุ IP ได้ กรุณารีเฟรช'); return }
+    
+    // CRITICAL FIX: Fallback to fetch IP if not available
+    let finalIP = clientIP
+    if (!finalIP) {
+      try {
+        const res = await fetch('https://api.ipify.org?format=json', { cache: 'no-cache' })
+        const data = await res.json()
+        if (data.ip) {
+          finalIP = data.ip
+          setClientIP(data.ip)
+        }
+      } catch (err) {
+        console.error('[IP Fallback] Failed:', err)
+      }
+    }
+    
+    if (!finalIP) { setError('ไม่สามารถระบุ IP ได้ กรุณารีเฟรช'); return }
     if (!formData.type) { setError('กรุณาเลือกประเภทเหตุการณ์'); return }
-    let reportLoc = null, locName = ''
-    if (formData.locationType === 'gps' && location) { reportLoc = location; locName = `GPS: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` }
-    else if (selectedDistrict && selectedSubdistrict) { reportLoc = districtCoords[selectedDistrict]; locName = `ต.${selectedSubdistrict} อ.${selectedDistrict}` }
-    else { setError('กรุณาระบุตำแหน่ง'); return }
+    
+    // FIX: ใช้ GPS จริงเท่านั้น ไม่ใช้ districtCoords
+    let realLat = null
+    let realLng = null
+    let locName = ''
+    
+    if (formData.locationType === 'gps' && location) {
+      // ใช้ GPS จริงจากอุปกรณ์ผู้ใช้
+      realLat = location.lat
+      realLng = location.lng
+      locName = `GPS: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
+    } else if (selectedDistrict && selectedSubdistrict) {
+      // เลือกตำบลด้วยตัวเอง - ไม่มีพิกัด GPS จริง
+      realLat = null
+      realLng = null
+      locName = `ต.${selectedSubdistrict} อ.${selectedDistrict}`
+    } else {
+      setError('กรุณาระบุตำแหน่ง')
+      return
+    }
+    
     setSubmitting(true)
-    const newReport = { id: `rpt_${Date.now()}_${Math.random().toString(36).substr(2,5)}`, type: formData.type, userName: 'ไม่ระบุตัวตน', lat: reportLoc?.lat, lng: reportLoc?.lng, location: locName, province: 'ตราด', district: selectedDistrict, subdistrict: selectedSubdistrict, description: formData.description, time: new Date().toISOString(), verified: false, status: 'pending', ip: clientIP }
-    try { await fetch((import.meta.env.VITE_API_URL || 'http://localhost:3001') + '/api/v1/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newReport) }) } catch (e) {}
+    console.log('[Report] Saving with IP:', finalIP, 'GPS:', realLat, realLng)
+    
+    const newReport = {
+      id: `rpt_${Date.now()}_${Math.random().toString(36).substr(2,5)}`,
+      type: formData.type,
+      userName: 'ไม่ระบุตัวตน',
+      lat: realLat,  // null ถ้าไม่ได้ใช้ GPS จริง
+      lng: realLng,  // null ถ้าไม่ได้ใช้ GPS จริง
+      location: locName,
+      province: 'ตราด',
+      district: selectedDistrict || null,
+      subdistrict: selectedSubdistrict || null,
+      description: formData.description,
+      time: new Date().toISOString(),
+      verified: false,
+      status: 'pending',
+      ip: finalIP
+    }
+    
+    // FIX: บันทึกแค่ localStorage เท่านั้น ไม่ส่ง API (ป้องกัน duplicate)
+    // API จะมี reports เก่าที่ไม่ sync กับ localStorage ทำให้เกิด duplicate
     const existing = JSON.parse(localStorage.getItem('userReports') || '[]')
     existing.unshift(newReport)
     localStorage.setItem('userReports', JSON.stringify(existing))
-    setSubmitted(true); setFormData({ type: '', description: '', locationType: 'manual' }); setSelectedDistrict(''); setSelectedSubdistrict(''); setLocation(null); onSubmitSuccess?.(newReport); setSubmitting(false)
+    
+    setSubmitted(true)
+    setFormData({ type: '', description: '', locationType: 'manual' })
+    setSelectedDistrict('')
+    setSelectedSubdistrict('')
+    setLocation(null)
+    onSubmitSuccess?.(newReport)
+    setSubmitting(false)
     setTimeout(() => setSubmitted(false), 5000)
   }
 
