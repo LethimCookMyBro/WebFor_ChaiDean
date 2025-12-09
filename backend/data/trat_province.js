@@ -29,61 +29,61 @@ const TRAT_DISTRICTS = {
     isBorder: false,
     population: 70000,
     subdistricts: [
-      { name: "บางพระ", code: "230101", lat: 12.2364, lng: 102.5139 },
-      { name: "หนองเสม็ด", code: "230102", lat: 12.2578, lng: 102.4856 },
-      { name: "หนองโสน", code: "230103", lat: 12.2892, lng: 102.4667 },
-      { name: "หนองคันทรง", code: "230104", lat: 12.3167, lng: 102.4833 },
-      { name: "ห้วงน้ำขาว", code: "230105", lat: 12.2833, lng: 102.5333 },
-      { name: "อ่าวใหญ่", code: "230106", lat: 12.2000, lng: 102.5833 },
-      { name: "วังกระแจะ", code: "230107", lat: 12.1833, lng: 102.4833 },
-      { name: "ห้วยแร้ง", code: "230108", lat: 12.1500, lng: 102.5333 },
-      { name: "เนินทราย", code: "230109", lat: 12.2167, lng: 102.5500 },
-      { name: "ท่าพริก", code: "230110", lat: 12.3000, lng: 102.5167 },
-      { name: "ท่ากุ่ม", code: "230111", lat: 12.2667, lng: 102.5667 },
-      { name: "ตะกาง", code: "230112", lat: 12.3333, lng: 102.5500 },
-      { name: "ชำราก", code: "230113", lat: 12.2000, lng: 102.4667 },
-      { name: "แหลมกลัด", code: "230114", lat: 12.1333, lng: 102.4500 }
+      { name: "ชำราก", code: "230101", lat: 12.19400, lng: 102.67700 },
+      { name: "ตะกาง", code: "230102", lat: 12.25000, lng: 102.65900 },
+      { name: "ท่ากุ่ม", code: "230103", lat: 12.34500, lng: 102.67500 },
+      { name: "ท่าพริก", code: "230104", lat: 12.24300, lng: 102.58900 },
+      { name: "วังกระแจะ", code: "230105", lat: 12.27200, lng: 102.47900 },
+      { name: "หนองคันทรง", code: "230106", lat: 12.19400, lng: 102.54200 },
+      { name: "หนองเสม็ด", code: "230107", lat: 12.21600, lng: 102.50400 },
+      { name: "หนองโสน", code: "230108", lat: 12.18400, lng: 102.48800 },
+      { name: "ห้วงน้ำขาว", code: "230109", lat: 12.14300, lng: 102.51800 },
+      { name: "ห้วยแร้ง", code: "230110", lat: 12.38700, lng: 102.56000 },
+      { name: "อ่าวใหญ่", code: "230111", lat: 12.07800, lng: 102.56200 },
+      { name: "เนินทราย", code: "230112", lat: 12.28300, lng: 102.54700 },
+      { name: "แหลมกลัด", code: "230113", lat: 12.11700, lng: 102.70400 }
     ]
   },
   "คลองใหญ่": {
     code: "2302",
-    centroid: { lat: 11.7667, lng: 102.8833 },
+    centroid: { lat: 11.7740, lng: 102.8890 },
     isBorder: true,
     borderLength: 38,
     population: 35000,
     subdistricts: [
-      { name: "คลองใหญ่", code: "230201", lat: 11.7667, lng: 102.8667, distanceToBorder: 8 },
-      { name: "ไม้รูด", code: "230202", lat: 11.8167, lng: 102.8333, distanceToBorder: 12 },
-      { name: "หาดเล็ก", code: "230203", lat: 11.6833, lng: 102.9167, distanceToBorder: 1, hasCrossing: true }
+      { name: "คลองใหญ่", code: "230201", lat: 11.77400, lng: 102.88900, distanceToBorder: 8 },
+      { name: "หาดเล็ก", code: "230202", lat: 11.69900, lng: 102.90900, distanceToBorder: 1, hasCrossing: true },
+      { name: "ไม้รูด", code: "230203", lat: 11.91000, lng: 102.80500, distanceToBorder: 12 }
     ]
   },
   "เขาสมิง": {
     code: "2303",
-    centroid: { lat: 12.3833, lng: 102.6500 },
+    centroid: { lat: 12.3400, lng: 102.4370 },
     isBorder: false,
     population: 45000,
     subdistricts: [
-      { name: "เขาสมิง", code: "230301", lat: 12.4000, lng: 102.6333 },
-      { name: "แสนตุ้ง", code: "230302", lat: 12.4333, lng: 102.5833 },
-      { name: "วังตะเคียน", code: "230303", lat: 12.3667, lng: 102.7000 },
-      { name: "ท่าโสม", code: "230304", lat: 12.3333, lng: 102.6167 },
-      { name: "สะตอ", code: "230305", lat: 12.3000, lng: 102.7333 },
-      { name: "ประณีต", code: "230306", lat: 12.4167, lng: 102.7167 },
-      { name: "เทพนิมิต", code: "230307", lat: 12.3500, lng: 102.6667 }
+      { name: "ทุ่งนนทรี", code: "230301", lat: 12.40500, lng: 102.50100 },
+      { name: "ท่าโสม", code: "230302", lat: 12.29600, lng: 102.34600 },
+      { name: "ประณีต", code: "230303", lat: 12.52500, lng: 102.35900 },
+      { name: "วังตะเคียน", code: "230304", lat: 12.47800, lng: 102.53100 },
+      { name: "สะตอ", code: "230305", lat: 12.55300, lng: 102.43400 },
+      { name: "เขาสมิง", code: "230306", lat: 12.34000, lng: 102.43700 },
+      { name: "เทพนิมิต", code: "230307", lat: 12.46900, lng: 102.43500 },
+      { name: "แสนตุ้ง", code: "230308", lat: 12.39800, lng: 102.38200 }
     ]
   },
   "บ่อไร่": {
     code: "2304",
-    centroid: { lat: 12.3833, lng: 102.8000 },
+    centroid: { lat: 12.6040, lng: 102.5590 },
     isBorder: true,
     borderLength: 45,
     population: 38000,
     subdistricts: [
-      { name: "บ่อพลอย", code: "230401", lat: 12.4167, lng: 102.8000, distanceToBorder: 15 },
-      { name: "ช้างทูน", code: "230402", lat: 12.3500, lng: 102.7667, distanceToBorder: 18 },
-      { name: "ด่านชุมพล", code: "230403", lat: 12.3000, lng: 102.8333, distanceToBorder: 8 },
-      { name: "หนองบอน", code: "230404", lat: 12.4500, lng: 102.7333 },
-      { name: "นนทรีย์", code: "230405", lat: 12.3833, lng: 102.8500, distanceToBorder: 12 }
+      { name: "ช้างทูน", code: "230401", lat: 12.58500, lng: 102.46900, distanceToBorder: 18 },
+      { name: "ด่านชุมพล", code: "230402", lat: 12.46100, lng: 102.66400, distanceToBorder: 8 },
+      { name: "นนทรีย์", code: "230403", lat: 12.54400, lng: 102.60000, distanceToBorder: 12 },
+      { name: "บ่อพลอย", code: "230404", lat: 12.60400, lng: 102.55900, distanceToBorder: 15 },
+      { name: "หนองบอน", code: "230405", lat: 12.68300, lng: 102.44700 }
     ]
   },
   "แหลมงอบ": {
@@ -100,12 +100,13 @@ const TRAT_DISTRICTS = {
   },
   "เกาะกูด": {
     code: "2306",
-    centroid: { lat: 11.6500, lng: 102.5667 },
+    centroid: { lat: 11.6880, lng: 102.5430 },
     isBorder: false,
     isIsland: true,
     population: 3000,
     subdistricts: [
-      { name: "เกาะกูด", code: "230601", lat: 11.6667, lng: 102.5833 }
+      { name: "เกาะกูด", code: "230601", lat: 11.68800, lng: 102.54300 },
+      { name: "เกาะหมาก", code: "230602", lat: 11.81825, lng: 102.43175 }
     ]
   },
   "เกาะช้าง": {
