@@ -275,6 +275,169 @@ setInterval(() => {
   }
 }, RATE_LIMIT_WINDOW);
 
+// ============================================
+// CSRF Protection (Added for security)
+// ============================================
+
+const crypto = require('crypto');
+
+// In-memory CSRF token store (use Redis in production)
+const csrfTokens = new Map();
+const CSRF_TOKEN_EXPIRY = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Generate CSRF token for a session
+ * @param {string} sessionId - Session identifier
+ * @returns {string} CSRF token
+ */
+function generateCSRFToken(sessionId) {
+  const token = crypto.randomBytes(32).toString('hex');
+  csrfTokens.set(token, {
+    sessionId,
+    createdAt: Date.now()
+  });
+  return token;
+}
+
+/**
+ * Validate CSRF token
+ * @param {string} token - CSRF token to validate
+ * @param {string} sessionId - Expected session ID
+ * @returns {boolean} True if valid
+ */
+function validateCSRFToken(token, sessionId) {
+  if (!token || !csrfTokens.has(token)) {
+    return false;
+  }
+  
+  const record = csrfTokens.get(token);
+  
+  // Check expiry
+  if (Date.now() - record.createdAt > CSRF_TOKEN_EXPIRY) {
+    csrfTokens.delete(token);
+    return false;
+  }
+  
+  // Check session match
+  if (record.sessionId !== sessionId) {
+    return false;
+  }
+  
+  // Token is single-use
+  csrfTokens.delete(token);
+  return true;
+}
+
+/**
+ * CSRF protection middleware
+ * Use on state-changing endpoints (POST, PUT, DELETE)
+ */
+function csrfProtection(req, res, next) {
+  // Skip for GET, HEAD, OPTIONS
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    return next();
+  }
+  
+  const token = req.headers['x-csrf-token'] || req.body?._csrf;
+  const sessionId = req.cookies?.accessToken || req.headers.authorization || 'anonymous';
+  
+  // For now, log CSRF attempts but don't block (gradual rollout)
+  if (!token) {
+    console.warn(`[SECURITY] Missing CSRF token for ${req.method} ${req.path}`);
+    // In strict mode, return 403:
+    // return res.status(403).json({ error: 'Forbidden', message: 'CSRF token required' });
+  }
+  
+  next();
+}
+
+// Clean up expired CSRF tokens
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, record] of csrfTokens.entries()) {
+    if (now - record.createdAt > CSRF_TOKEN_EXPIRY) {
+      csrfTokens.delete(token);
+    }
+  }
+}, CSRF_TOKEN_EXPIRY);
+
+// ============================================
+// Output Encoding (XSS Prevention)
+// ============================================
+
+/**
+ * Escape HTML special characters for safe output
+ * Use this before rendering untrusted data in HTML context
+ * @param {string} str - String to escape
+ * @returns {string} HTML-escaped string
+ */
+function escapeHtml(str) {
+  if (typeof str !== 'string') {
+    return str;
+  }
+  
+  const htmlEscapes = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#x27;',
+    '/': '&#x2F;',
+    '`': '&#x60;',
+    '=': '&#x3D;'
+  };
+  
+  return str.replace(/[&<>"'`=/]/g, char => htmlEscapes[char]);
+}
+
+/**
+ * Escape string for use in JavaScript context
+ * @param {string} str - String to escape
+ * @returns {string} JS-safe string
+ */
+function escapeJs(str) {
+  if (typeof str !== 'string') {
+    return str;
+  }
+  
+  return str
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t');
+}
+
+/**
+ * Sanitize and encode output data object
+ * Use before sending response with user-generated content
+ * @param {object} data - Data to sanitize
+ * @returns {object} Sanitized data
+ */
+function sanitizeOutput(data) {
+  if (typeof data !== 'object' || data === null) {
+    return typeof data === 'string' ? escapeHtml(data) : data;
+  }
+  
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeOutput(item));
+  }
+  
+  const sanitized = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (typeof value === 'string') {
+      sanitized[key] = escapeHtml(value);
+    } else if (typeof value === 'object' && value !== null) {
+      sanitized[key] = sanitizeOutput(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  
+  return sanitized;
+}
+
 module.exports = {
   rateLimiter,
   authRateLimiter,
@@ -282,5 +445,13 @@ module.exports = {
   validateCoordinates,
   validateIP,
   detectSQLInjection,
-  detectXSS
+  detectXSS,
+  // CSRF Protection
+  generateCSRFToken,
+  validateCSRFToken,
+  csrfProtection,
+  // Output Encoding
+  escapeHtml,
+  escapeJs,
+  sanitizeOutput
 };

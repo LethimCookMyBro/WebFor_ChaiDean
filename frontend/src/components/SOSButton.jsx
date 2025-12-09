@@ -70,6 +70,10 @@ export default function SOSButton({ userId, userName, userPhone, userDistrict, o
     endHold()
     setSent(true)
 
+    // Debug: log received props
+    console.log('[SOS] Triggering with props:', { userId, userName, userPhone, userDistrict })
+    console.log('[SOS] GPS Location:', location)
+
     const sosAlert = {
       id: `sos_${Date.now()}`,
       odUserId: userId || 'anonymous',

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import ThreatBanner from '../components/ThreatBanner'
 import QuickActions from '../components/QuickActions'
 import LiveReports from '../components/LiveReports'
-import FamilyDashboard from '../components/FamilyDashboard'
 import ReportForm from '../components/ReportForm'
 import { Lock } from 'lucide-react'
 
@@ -81,20 +80,7 @@ export default function HomeTab({
           </a>
         </div>
       )}
-
-      {/* Protected: Family Dashboard */}
-      {isLoggedIn ? (
-        <FamilyDashboard userId={userId} userName={userName} />
-      ) : (
-        <div className="bg-slate-100 rounded-2xl p-6 border-2 border-dashed border-slate-300 text-center">
-          <Lock className="w-8 h-8 mx-auto text-slate-400 mb-2" />
-          <p className="font-medium text-slate-600">สถานะครอบครัว</p>
-          <p className="text-sm text-slate-400 mb-3">ต้องล็อกอินก่อนใช้งาน</p>
-          <a href="/login" className="inline-block px-4 py-2 bg-blue-500 text-white rounded-xl text-sm">
-            ล็อกอิน
-          </a>
-        </div>
-      )}
     </div>
   )
 }
+

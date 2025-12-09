@@ -70,11 +70,17 @@ initReports();
 /**
  * GET /api/v1/reports
  * ดึงรายงานทั้งหมด พร้อม filter
+ * Now supports userId filter for data separation
  */
 router.get('/', (req, res) => {
-  const { province, type, verified, hours } = req.query;
+  const { province, type, verified, hours, userId } = req.query;
   
   let filteredReports = [...reports];
+  
+  // Filter by userId (for data separation - show only user's own reports)
+  if (userId) {
+    filteredReports = filteredReports.filter(r => r.userId === userId);
+  }
   
   // Filter by province
   if (province) {
@@ -159,9 +165,10 @@ router.get('/nearby', (req, res) => {
 /**
  * POST /api/v1/reports
  * สร้างรายงานใหม่ (จากประชาชน)
+ * Now includes userId for data separation
  */
 router.post('/', (req, res) => {
-  const { type, lat, lng, description, source } = req.body;
+  const { type, lat, lng, description, source, userId, userName, userPhone, userDistrict } = req.body;
   
   if (!type || !lat || !lng) {
     return res.status(400).json({
@@ -192,7 +199,12 @@ router.post('/', (req, res) => {
     verified: false, // ต้องรอการยืนยัน
     severity: 'unknown',
     description: description || null,
-    source: source || 'ประชาชน'
+    source: source || 'ประชาชน',
+    // User data for separation - ผูกข้อมูลกับผู้ใช้
+    userId: userId || null,
+    userName: userName || null,
+    userPhone: userPhone || null,
+    userDistrict: userDistrict || null
   };
   
   reports.unshift(newReport); // เพิ่มที่หัว array

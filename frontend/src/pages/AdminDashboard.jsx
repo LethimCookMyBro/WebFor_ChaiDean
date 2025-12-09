@@ -2,8 +2,16 @@ import { useState, useEffect } from 'react'
 import {
   Shield, Radio, AlertTriangle, CheckCircle, XCircle, 
   Clock, MapPin, Filter, RefreshCw, ChevronDown, ChevronUp,
-  Home, Siren, Send, MessageSquare, Phone, Trash2, UserCheck, LogOut
+  Home, Siren, Send, MessageSquare, Phone, Trash2, UserCheck, LogOut, Activity, FileText
 } from 'lucide-react'
+
+// Threat levels
+const THREAT_LEVELS = {
+  GREEN: { level: 'GREEN', name: 'ปกติ', color: '#22c55e', bgColor: '#dcfce7' },
+  YELLOW: { level: 'YELLOW', name: 'เฝ้าระวัง', color: '#eab308', bgColor: '#fef9c3' },
+  ORANGE: { level: 'ORANGE', name: 'ยกระดับ', color: '#f97316', bgColor: '#ffedd5' },
+  RED: { level: 'RED', name: 'อันตราย', color: '#dc2626', bgColor: '#fee2e2' },
+}
 
 // ตำบลจังหวัดตราด
 const TRAT_DISTRICTS = ["เมืองตราด", "คลองใหญ่", "เขาสมิง", "บ่อไร่", "แหลมงอบ", "เกาะกูด", "เกาะช้าง"]
@@ -33,6 +41,18 @@ export default function AdminDashboard() {
   const [pendingUsers, setPendingUsers] = useState([])
   const [allMembers, setAllMembers] = useState([])
   const [broadcasts, setBroadcasts] = useState([])
+  const [logs, setLogs] = useState([])
+  const [logStats, setLogStats] = useState(null)
+  const [logFilter, setLogFilter] = useState({ level: '', category: '' })
+  const [threatLevel, setThreatLevel] = useState(() => {
+    return localStorage.getItem('adminThreatLevel') || 'YELLOW'
+  })
+  
+  // Save threat level to localStorage when changed
+  const handleThreatLevelChange = (level) => {
+    setThreatLevel(level)
+    localStorage.setItem('adminThreatLevel', level)
+  }
   
   // Admin logout
   const handleAdminLogout = () => {
@@ -68,6 +88,23 @@ export default function AdminDashboard() {
     // Load broadcasts
     const broadcastData = JSON.parse(localStorage.getItem('adminBroadcasts') || '[]')
     setBroadcasts(broadcastData)
+    
+    // Fetch logs from API
+    try {
+      const logsResponse = await fetch(`${API_BASE}/api/v1/admin/logs?limit=100`)
+      if (logsResponse.ok) {
+        const logsData = await logsResponse.json()
+        setLogs(logsData.logs || [])
+      }
+      
+      const statsResponse = await fetch(`${API_BASE}/api/v1/admin/logs/stats`)
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json()
+        setLogStats(statsData.stats)
+      }
+    } catch (error) {
+      console.error('Error fetching logs:', error)
+    }
     
     setLoading(false)
   }
@@ -254,6 +291,40 @@ export default function AdminDashboard() {
           )}
         </div>
 
+        {/* Threat Level Control */}
+        <div className="bg-white rounded-xl p-4 border mb-4">
+          <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+            <Activity className="w-5 h-5" />
+            ควบคุมระดับภัยคุกคาม
+          </h3>
+          <div className="grid grid-cols-4 gap-2">
+            {Object.values(THREAT_LEVELS).map((level) => (
+              <button
+                key={level.level}
+                onClick={() => handleThreatLevelChange(level.level)}
+                className={`p-3 rounded-xl text-center transition-all ${
+                  threatLevel === level.level
+                    ? 'ring-2 ring-offset-2 scale-105'
+                    : 'opacity-60 hover:opacity-100'
+                }`}
+                style={{ 
+                  backgroundColor: level.bgColor, 
+                  color: level.color,
+                  ringColor: level.color
+                }}
+              >
+                <div className="text-2xl font-bold">{level.level}</div>
+                <div className="text-xs font-medium">{level.name}</div>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-slate-500 mt-2">
+            ระดับปัจจุบัน: <span className="font-bold" style={{ color: THREAT_LEVELS[threatLevel].color }}>
+              {THREAT_LEVELS[threatLevel].name}
+            </span> (บันทึกอัตโนมัติ)
+          </p>
+        </div>
+
         {/* Broadcast Button */}
         <button
           onClick={() => setShowBroadcastForm(!showBroadcastForm)}
@@ -344,6 +415,12 @@ export default function AdminDashboard() {
             className={`flex-1 py-2 rounded-lg font-medium ${activeTab === 'members' ? 'bg-emerald-500 text-white' : 'bg-white border'}`}
           >
             👥 สมาชิก ({allMembers.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`flex-1 py-2 rounded-lg font-medium ${activeTab === 'logs' ? 'bg-slate-700 text-white' : 'bg-white border'}`}
+          >
+            📝 Logs
           </button>
         </div>
 
@@ -605,6 +682,118 @@ export default function AdminDashboard() {
               )}
             </div>
           </>
+        )}
+
+        {/* Logs Tab */}
+        {activeTab === 'logs' && (
+          <div className="space-y-4">
+            {/* Log Stats */}
+            {logStats && (
+              <div className="grid grid-cols-4 gap-2">
+                <div className="bg-white rounded-lg p-3 border text-center">
+                  <div className="text-xl font-bold">{logStats.total}</div>
+                  <div className="text-xs text-slate-500">ทั้งหมด</div>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-3 border border-blue-200 text-center">
+                  <div className="text-xl font-bold text-blue-600">{logStats.lastHour?.total || 0}</div>
+                  <div className="text-xs text-blue-700">1 ชั่วโมง</div>
+                </div>
+                <div className="bg-red-50 rounded-lg p-3 border border-red-200 text-center">
+                  <div className="text-xl font-bold text-red-600">{logStats.last24Hours?.errors || 0}</div>
+                  <div className="text-xs text-red-700">Errors (24ชม.)</div>
+                </div>
+                <div className="bg-purple-50 rounded-lg p-3 border border-purple-200 text-center">
+                  <div className="text-xl font-bold text-purple-600">{logStats.last24Hours?.security || 0}</div>
+                  <div className="text-xs text-purple-700">Security</div>
+                </div>
+              </div>
+            )}
+
+            {/* Log Filters */}
+            <div className="bg-white rounded-lg p-3 border flex gap-2">
+              <select 
+                value={logFilter.level} 
+                onChange={(e) => setLogFilter({ ...logFilter, level: e.target.value })}
+                className="p-2 border rounded-lg text-sm flex-1"
+              >
+                <option value="">ทุกระดับ</option>
+                <option value="ERROR">ERROR</option>
+                <option value="WARN">WARN</option>
+                <option value="INFO">INFO</option>
+                <option value="SECURITY">SECURITY</option>
+                <option value="DEBUG">DEBUG</option>
+              </select>
+              <select 
+                value={logFilter.category} 
+                onChange={(e) => setLogFilter({ ...logFilter, category: e.target.value })}
+                className="p-2 border rounded-lg text-sm flex-1"
+              >
+                <option value="">ทุกหมวด</option>
+                <option value="AUTH">AUTH</option>
+                <option value="SYSTEM">SYSTEM</option>
+                <option value="SERVER">SERVER</option>
+                <option value="ADMIN">ADMIN</option>
+              </select>
+            </div>
+
+            {/* Logs List */}
+            <div className="bg-white rounded-xl border overflow-hidden">
+              <div className="p-3 border-b bg-slate-800 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  <span className="font-bold">System Logs</span>
+                </div>
+                <span className="text-xs text-slate-400">{logs.length} รายการ</span>
+              </div>
+              
+              <div className="divide-y max-h-[500px] overflow-y-auto font-mono text-xs">
+                {logs
+                  .filter(log => {
+                    if (logFilter.level && log.level !== logFilter.level) return false;
+                    if (logFilter.category && log.category !== logFilter.category) return false;
+                    return true;
+                  })
+                  .slice(0, 100)
+                  .map((log) => {
+                    const levelColors = {
+                      DEBUG: 'text-gray-500 bg-gray-50',
+                      INFO: 'text-blue-600 bg-blue-50',
+                      WARN: 'text-yellow-600 bg-yellow-50',
+                      ERROR: 'text-red-600 bg-red-50',
+                      SECURITY: 'text-purple-600 bg-purple-50'
+                    };
+                    const colorClass = levelColors[log.level] || 'text-slate-600';
+                    
+                    return (
+                      <div key={log.id} className={`p-2 ${colorClass}`}>
+                        <div className="flex items-start gap-2">
+                          <span className="text-slate-400 shrink-0">
+                            {new Date(log.timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${colorClass}`}>
+                            {log.level}
+                          </span>
+                          <span className="text-slate-500">[{log.category}]</span>
+                          <span className="flex-1 break-all">{log.message}</span>
+                        </div>
+                        {log.metadata && Object.keys(log.metadata).length > 0 && (
+                          <div className="mt-1 ml-20 text-[10px] text-slate-400 break-all">
+                            {JSON.stringify(log.metadata)}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                }
+                {logs.length === 0 && (
+                  <div className="p-8 text-center text-slate-400">
+                    <FileText className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                    <p>ยังไม่มี logs</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </main>
     </div>

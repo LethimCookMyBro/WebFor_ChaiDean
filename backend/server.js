@@ -35,7 +35,11 @@ const familyRoutes = require('./routes/v1/family');
 const geoRoutes = require('./routes/v1/geo');
 const reportsRoutes = require('./routes/v1/reports');
 const authRoutes = require('./routes/v1/auth');
+const adminRoutes = require('./routes/v1/admin');
 const healthRoutes = require('./routes/health');
+
+// Import logger
+const logger = require('./services/logger');
 
 // Import security middleware
 const {
@@ -61,9 +65,11 @@ const parseOrigins = () => {
   return [
     'http://localhost:5173',
     'http://localhost:5174',
+    'http://localhost:5175',
     'http://localhost:3000',
     'http://127.0.0.1:5173',
-    'http://127.0.0.1:5174'
+    'http://127.0.0.1:5174',
+    'http://127.0.0.1:5175'
   ];
 };
 
@@ -103,30 +109,63 @@ const trustedProxies = process.env.TRUSTED_PROXIES || 'loopback';
 app.set('trust proxy', trustedProxies);
 
 // ============================================
-// Helmet Security Headers
+// Helmet Security Headers (Enhanced)
 // ============================================
 
 app.use(helmet({
+  // Content Security Policy - ป้องกัน XSS, data injection, clickjacking
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
+      // Strict script source - no inline scripts allowed (strongest XSS protection)
       scriptSrc: ["'self'"],
+      // Styles - allow Google Fonts but no inline styles
       styleSrc: ["'self'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'", ...allowedOrigins],
+      // Block all frame embedding (clickjacking protection)
       frameSrc: ["'none'"],
+      frameAncestors: ["'none'"],
       objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
       upgradeInsecureRequests: NODE_ENV === 'production' ? [] : null
     }
   },
   crossOriginEmbedderPolicy: false, // Required for some map tiles
+  // HTTP Strict Transport Security
   hsts: {
-    maxAge: 31536000,
+    maxAge: 31536000, // 1 year
     includeSubDomains: true,
     preload: true
-  }
+  },
+  // X-Frame-Options - ป้องกัน clickjacking
+  frameguard: {
+    action: 'deny'
+  },
+  // X-Content-Type-Options - ป้องกัน MIME sniffing
+  noSniff: true,
+  // Referrer-Policy - ควบคุมข้อมูล referrer
+  referrerPolicy: {
+    policy: 'strict-origin-when-cross-origin'
+  },
+  // X-XSS-Protection (legacy but still useful for older browsers)
+  xssFilter: true,
+  // Hide X-Powered-By header
+  hidePoweredBy: true
 }));
+
+// Additional security headers not covered by Helmet
+app.use((req, res, next) => {
+  // Permissions-Policy - ปิดการเข้าถึง APIs ที่ไม่จำเป็น
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
+  // X-Download-Options - ป้องกันไฟล์ download ถูก execute โดยอัตโนมัติ
+  res.setHeader('X-Download-Options', 'noopen');
+  // X-Permitted-Cross-Domain-Policies
+  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+  next();
+});
 
 // ============================================
 // Middleware Stack
@@ -203,6 +242,9 @@ app.use('/api/v1/family', sosBodyLimit, rateLimiter, familyRoutes);
 app.use('/api/v1/geo', rateLimiter, geoRoutes);
 app.use('/api/v1/reports', reportsBodyLimit, rateLimiter, reportsRoutes);
 
+// Admin routes (logs, stats, etc.)
+app.use('/api/v1/admin', adminRoutes);
+
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
@@ -245,7 +287,14 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error(`[ERROR] ${req.requestId || 'unknown'}:`, err.message);
+  // Log error using logger service
+  logger.error('SERVER', err.message, {
+    requestId: req.requestId,
+    path: req.path,
+    method: req.method,
+    ip: req.clientIp || req.ip,
+    stack: NODE_ENV === 'development' ? err.stack : undefined
+  });
   
   if (NODE_ENV === 'development') {
     console.error(err.stack);
@@ -287,6 +336,7 @@ app.use((err, req, res, next) => {
 // ============================================
 
 const server = app.listen(PORT, () => {
+  logger.info('SYSTEM', 'Server started', { port: PORT, env: NODE_ENV });
   console.log('');
   console.log('🛡️  ═══════════════════════════════════════════════');
   console.log('🛡️  Border Safety Risk Checker API v2.1');
@@ -298,6 +348,7 @@ const server = app.listen(PORT, () => {
   console.log('🛡️  ───────────────────────────────────────────────');
   console.log(`🛡️  Health: http://localhost:${PORT}/api/health`);
   console.log(`🛡️  Auth: http://localhost:${PORT}/api/v1/auth/*`);
+  console.log(`🛡️  Admin Logs: http://localhost:${PORT}/api/v1/admin/logs`);
   console.log(`🛡️  Locate: POST http://localhost:${PORT}/api/v1/locate`);
   console.log(`🛡️  Family: http://localhost:${PORT}/api/v1/family/*`);
   console.log('🛡️  ═══════════════════════════════════════════════');

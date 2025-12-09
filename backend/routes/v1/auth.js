@@ -19,6 +19,7 @@ const {
   requireAuth
 } = require('../../middleware/auth');
 const { timingSafeCompare, generateSecureToken } = require('../../utils/crypto');
+const logger = require('../../services/logger');
 
 // ============================================
 // Configuration
@@ -179,16 +180,17 @@ if (process.env.COOKIE_DOMAIN) {
 
 /**
  * Set auth cookies on response
+ * Extended: access token 1hr (was 15min), refresh token 30d (was 7d)
  */
 function setAuthCookies(res, accessToken, refreshToken) {
   res.cookie('accessToken', accessToken, {
     ...COOKIE_OPTIONS,
-    maxAge: 15 * 60 * 1000 // 15 minutes
+    maxAge: 60 * 60 * 1000 // 1 hour (extended from 15 minutes)
   });
   
   res.cookie('refreshToken', refreshToken, {
     ...COOKIE_OPTIONS,
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days (extended from 7 days)
   });
 }
 
@@ -215,6 +217,7 @@ router.post('/login', async (req, res) => {
     
     // Input validation
     if (!phone || typeof phone !== 'string' || phone.length !== 10) {
+      logger.warn('AUTH', 'Login attempt with invalid phone format', { phone: phone?.slice(0, 3) + '***', ip: clientIP });
       return res.status(400).json({
         error: 'Bad Request',
         message: 'กรุณาใส่เบอร์โทร 10 หลัก'
@@ -225,6 +228,7 @@ router.post('/login', async (req, res) => {
     const lockout = checkAccountLockout(phone);
     if (lockout.locked) {
       const minutes = Math.ceil(lockout.remainingMs / 60000);
+      logger.security('AUTH', 'Login blocked - account locked', { phone: phone.slice(0, 3) + '***', ip: clientIP, remainingMinutes: minutes });
       return res.status(429).json({
         error: 'Too Many Requests',
         message: `บัญชีถูกล็อคชั่วคราว กรุณารอ ${minutes} นาที`
@@ -237,6 +241,7 @@ router.post('/login', async (req, res) => {
     
     // Check pending first
     if (pendingUsers.has(phone)) {
+      logger.info('AUTH', 'Login attempt with pending account', { phone: phone.slice(0, 3) + '***', ip: clientIP });
       return res.status(403).json({
         error: 'Forbidden',
         pending: true,
@@ -245,16 +250,16 @@ router.post('/login', async (req, res) => {
     }
     
     // Check approved users
-    let userData = approvedUsers.get(phone);
+    const userData = approvedUsers.get(phone);
     
-    // If not found in approved, allow login but with limited info
-    // (This is for development; in production, only approved users should login)
+    // If not found in approved, reject login - only registered users can access
     if (!userData) {
-      userData = {
-        name: 'ผู้ใช้',
-        phone: phone,
-        district: null
-      };
+      recordLoginAttempt(phone, false);
+      logger.security('AUTH', 'Login rejected - phone not registered', { phone: phone.slice(0, 3) + '***', ip: clientIP });
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'เบอร์โทรนี้ยังไม่ได้ลงทะเบียน กรุณาสมัครสมาชิกก่อน'
+      });
     }
     
     const userId = `user_${phone}`;
@@ -267,6 +272,8 @@ router.post('/login', async (req, res) => {
     
     // Set cookies
     setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
+    
+    logger.info('AUTH', 'User login success', { userId, name: userData.name, ip: clientIP });
     
     res.json({
       success: true,
@@ -281,7 +288,7 @@ router.post('/login', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[AUTH] Login error:', error.message);
+    logger.error('AUTH', 'Login error', { error: error.message, ip: req.clientIp || req.ip });
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'เกิดข้อผิดพลาด กรุณาลองใหม่'
@@ -399,22 +406,34 @@ router.post('/admin/login', async (req, res) => {
     }
     
     // Check password
-    // Development credentials (WARNING: Remove in production!)
+    // ⚠️ SECURITY: Development credentials - MUST NOT use in production!
     const DEV_PASSWORD = 'Trat_forTestJang$_+190';
     const isProduction = process.env.NODE_ENV === 'production';
+    
+    // 🔒 PRODUCTION SECURITY CHECK
+    if (isProduction && !adminPasswordHash) {
+      console.error('[SECURITY] ❌ CRITICAL: ADMIN_PASSWORD_HASH not set in production!');
+      console.error('[SECURITY] Admin login is BLOCKED until you set ADMIN_PASSWORD_HASH');
+      console.error('[SECURITY] Generate hash: node -e "require(\'bcryptjs\').hash(\'YOUR_PASSWORD\', 12).then(console.log)"');
+      return res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Admin authentication not configured. Contact administrator.'
+      });
+    }
     
     let isValidPassword = false;
     
     // In development, check plain text password first
     if (!isProduction && (password === DEV_PASSWORD)) {
       isValidPassword = true;
-      console.log('[AUTH] Admin login using development credentials');
+      console.warn('[AUTH] ⚠️ Admin login using DEVELOPMENT credentials - NOT SECURE!');
     } else if (adminPasswordHash) {
       // Use hashed password in production or if hash is provided
       isValidPassword = await verifyPassword(password, adminPasswordHash);
     } else if (!isProduction) {
-      // Fallback to dev password if no hash set
-      console.warn('[AUTH] WARNING: ADMIN_PASSWORD_HASH not set, using development fallback');
+      // Fallback to dev password if no hash set (development only)
+      console.warn('[AUTH] ⚠️ WARNING: ADMIN_PASSWORD_HASH not set, using development fallback');
+      console.warn('[AUTH] ⚠️ Set ADMIN_PASSWORD_HASH in .env for production!');
       isValidPassword = password === DEV_PASSWORD;
     }
     

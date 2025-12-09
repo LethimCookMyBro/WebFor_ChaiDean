@@ -98,15 +98,17 @@ export default function LoginPage({ onSuccess }) {
         // Use the async login from AuthContext
         const result = await login(phone)
         
+        console.log('[LOGIN] Result:', result)
+        
         if (result.success) {
           onSuccess?.()
         } else if (result.pending) {
           setShowPending(true)
           setPendingUser({ phone })
         } else if (result.notFound) {
-          throw new Error('ไม่พบบัญชี กรุณาสมัครสมาชิกก่อน')
+          setError('ไม่พบบัญชี กรุณาสมัครสมาชิกก่อน')
         } else {
-          throw new Error(result.message || 'เข้าสู่ระบบไม่สำเร็จ')
+          setError(result.message || 'เข้าสู่ระบบไม่สำเร็จ')
         }
       }
     } catch (err) {
@@ -317,7 +319,6 @@ export default function LoginPage({ onSuccess }) {
           <ul className="text-xs text-blue-700 mt-2 space-y-1">
             <li>• แจ้งเหตุการณ์ได้</li>
             <li>• ส่ง SOS ฉุกเฉินได้</li>
-            <li>• ติดตามสถานะครอบครัวได้</li>
             <li>• ข้อมูลแยกตามผู้ใช้แต่ละคน</li>
           </ul>
         </div>
@@ -325,7 +326,7 @@ export default function LoginPage({ onSuccess }) {
         {/* Note about approval */}
         {mode === 'register' && (
           <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-            <p className="text-xs text-amber-700">
+            <p className="text-xs text-amber-700"> 
               <Clock className="w-3 h-3 inline mr-1" />
               หลังสมัครแล้ว ต้องรอ Admin ตรวจสอบและอนุมัติบัญชี
             </p>

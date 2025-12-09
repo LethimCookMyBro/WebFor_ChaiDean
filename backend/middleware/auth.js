@@ -22,7 +22,8 @@ const DEV_JWT_SECRET = 'dev-secret-key-for-development-only-do-not-use-in-produc
 
 let JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || DEV_JWT_SECRET;
-const ACCESS_TOKEN_EXPIRY = '15m';
+// Extended access token from 15m to 1h for better UX (less frequent re-authentication)
+const ACCESS_TOKEN_EXPIRY = '1h';
 const REFRESH_TOKEN_EXPIRY = '7d';
 const BCRYPT_COST = 12;
 
@@ -160,7 +161,7 @@ function generateTokenPair(userId, payload = {}) {
   return {
     accessToken: generateAccessToken(userId, payload),
     refreshToken: generateRefreshToken(userId),
-    expiresIn: 15 * 60 // 15 minutes in seconds
+    expiresIn: 60 * 60 // 1 hour in seconds (extended from 15 minutes)
   };
 }
 

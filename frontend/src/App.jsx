@@ -8,6 +8,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 // Import components
 import BottomNav from './components/BottomNav'
 import SOSButton from './components/SOSButton'
+import SelfDefenseGuide from './components/SelfDefenseGuide'
+import FirstAidGuide from './components/FirstAidGuide'
 
 // Import pages
 import HomeTab from './pages/HomeTab'
@@ -34,15 +36,27 @@ function MainApp() {
   const [activeTab, setActiveTab] = useState('home')
   const [isOnline, setIsOnline] = useState(true)
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [threatLevel, setThreatLevel] = useState('YELLOW')
+  const [threatLevel, setThreatLevel] = useState(() => {
+    return localStorage.getItem('adminThreatLevel') || 'YELLOW'
+  })
   const [showSOSModal, setShowSOSModal] = useState(false)
   const [showLoginPrompt, setShowLoginPrompt] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
 
-  // Update time
+  // Update time every second (for real-time display)
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000)
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(timer)
+  }, [])
+
+  // Poll for threat level changes from Admin (every 5 seconds)
+  useEffect(() => {
+    const checkThreatLevel = () => {
+      const level = localStorage.getItem('adminThreatLevel') || 'YELLOW'
+      setThreatLevel(level)
+    }
+    const interval = setInterval(checkThreatLevel, 5000)
+    return () => clearInterval(interval)
   }, [])
 
   // Online status
@@ -166,6 +180,12 @@ function MainApp() {
         {activeTab === 'check' && <CheckTab />}
         {activeTab === 'map' && <MapTab />}
         {activeTab === 'guide' && <GuideTab />}
+        {activeTab === 'safety' && (
+          <div className="space-y-4">
+            <SelfDefenseGuide />
+            <FirstAidGuide />
+          </div>
+        )}
       </main>
 
       {/* Bottom Nav */}
@@ -183,6 +203,13 @@ function MainApp() {
             </button>
             <div className="text-center pt-4">
               <h2 className="text-xl font-bold mb-4">ส่งสัญญาณฉุกเฉิน</h2>
+              {console.log('[SOS Modal] User data:', user)}
+              {console.log('[SOS Modal] isLoggedIn:', isLoggedIn)}
+              {!user?.name && (
+                <div className="text-amber-600 text-sm mb-3 bg-amber-50 p-2 rounded">
+                  ⚠️ กรุณา login ก่อนกด SOS เพื่อให้มีข้อมูลครบ
+                </div>
+              )}
               <SOSButton userId={user?.id} userName={user?.name} userPhone={user?.phone} userDistrict={user?.district} onSOSTriggered={handleSOSTriggered} />
               <button onClick={() => setShowSOSModal(false)} className="mt-6 w-full bg-slate-200 text-slate-800 p-3 rounded-xl">
                 ยกเลิก

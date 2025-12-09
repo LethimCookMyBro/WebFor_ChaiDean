@@ -3,8 +3,6 @@ import SafetyInstructions from '../components/SafetyInstructions'
 import WeakPointsGuide from '../components/WeakPointsGuide'
 import FakeNewsGuide from '../components/FakeNewsGuide'
 import EmergencyContacts from '../components/EmergencyContacts'
-import SelfDefenseGuide from '../components/SelfDefenseGuide'
-import FirstAidGuide from '../components/FirstAidGuide'
 
 /**
  * GuideTab Page
@@ -19,12 +17,6 @@ export default function GuideTab() {
       {/* Safety Instructions */}
       <SafetyInstructions />
 
-      {/* Self Defense Guide - NEW */}
-      <SelfDefenseGuide />
-
-      {/* First Aid Guide - NEW */}
-      <FirstAidGuide />
-
       {/* Weak Points in Home */}
       <WeakPointsGuide />
 
@@ -36,3 +28,4 @@ export default function GuideTab() {
     </div>
   )
 }
+
