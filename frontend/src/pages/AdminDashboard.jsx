@@ -71,6 +71,23 @@ export default function AdminDashboard() {
   // API Base
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
+  // Helper: Get CSRF token from cookie
+  const getCSRFToken = () => {
+    const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/)
+    return match ? match[1] : ''
+  }
+
+  // Helper: Build headers with CSRF token
+  const getHeaders = (includeContent = true) => {
+    const headers = {
+      'X-CSRF-Token': getCSRFToken()
+    }
+    if (includeContent) {
+      headers['Content-Type'] = 'application/json'
+    }
+    return headers
+  }
+
   // Fetch Data
   const fetchData = async () => {
     setLoading(true)
@@ -319,7 +336,7 @@ export default function AdminDashboard() {
       try {
         const res = await fetch(`${API_BASE}/api/v1/admin/blocked-ips`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getHeaders(),
           credentials: 'include',
           body: JSON.stringify({ ip, reason: 'Manual block by admin' })
         })
@@ -349,6 +366,7 @@ export default function AdminDashboard() {
       try {
         const res = await fetch(`${API_BASE}/api/v1/admin/blocked-ips/${ip}`, {
           method: 'DELETE',
+          headers: getHeaders(false),
           credentials: 'include'
         })
         

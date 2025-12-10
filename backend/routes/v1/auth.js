@@ -147,19 +147,8 @@ router.post('/admin/login', async (req, res) => {
       }
     }
     
-    // DEBUG: Log hash info (remove in production)
-    console.log('[DEBUG] Admin login attempt:', { 
-      username, 
-      hashExists: !!adminPasswordHash,
-      hashLength: adminPasswordHash?.length,
-      hashPrefix: adminPasswordHash?.substring(0, 10)
-    });
-    
     // Verify password using bcrypt only - no plaintext fallback
     const isValidPassword = await verifyPassword(password, adminPasswordHash);
-    
-    // DEBUG: Log result
-    console.log('[DEBUG] Password verification result:', isValidPassword);
     
     if (!isValidPassword) {
       const result = recordLoginAttempt(identifier, false);
